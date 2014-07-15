@@ -2,18 +2,20 @@
 
 var canvas = document.getElementById('canvas'),
     context = canvas.getContext('2d');
+var canvasWidth = $('#canvas').width();
+var canvasHeight = $('#canvas').height();
+var gameLoopIntervalId
 
 var snake = (function(context) {
   var tail = [];
   var direction = "right";
-  var food = new Food(10, context);
 
   [1, 2, 3].forEach(function(i) {
     tail.push(new Pixel(i, 1, 10, context));
   });
   var head = tail[tail.length - 1];
 
-  var print = function() {food.print();
+  var print = function() {
     tail.forEach(function(p) {
       p.print();
     })
@@ -53,10 +55,33 @@ var snake = (function(context) {
   };
 
   var check_borders = function() {
-    if (get_head().x < 0 || get_head().x >= 60 || get_head().y < 0 || get_head().y >= 30) {
+    // var head = get_head();
+    if (head.x < 0 || head.x >= canvasWidth/10 || head.y < 0 || head.y >= canvasHeight/10) {
       clearInterval(gameLoopIntervalId);
     }
   };
+
+  var check_food = function() {
+    if (head.x === food.x && head.y === food.y) {
+      tail.unshift(food);
+      head = food;
+      food = new Food(10, context);
+      food.generateNewPosition();
+      food.print();
+    }
+  }
+
+  var game_background = function() {
+    var imageObj = new Image();
+    imageObj.onload = function() {
+      var pattern = context.createPattern(imageObj, 'repeat');
+
+      context.rect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = pattern;
+      context.fill();
+    };
+    imageObj.src = 'http://preview.turbosquid.com/Preview/2012/06/25__16_53_03/360_tile_Grass.jpg35c1b446-6d9b-4a9e-bc5a-1a74920fbd9fLarge.jpg';
+  }
 
   return {
     print: print,
@@ -64,6 +89,8 @@ var snake = (function(context) {
     setDirection: setDirection,
     get_head: get_head,
     check_borders: check_borders,
+    check_food: check_food,
+    game_background: game_background,
   };
 
 }(context));
@@ -81,16 +108,25 @@ function initKeyController(cb) {
   };
 
   $(document).keydown(function(e) {
-    cb(keyCodeToDirectionTable[e.which]);
+    if(keyCodeToDirectionTable[e.which]) {
+      e.preventDefault();
+      cb(keyCodeToDirectionTable[e.which]);
+    }
   })
 }
 
-var gameLoopIntervalId = setInterval(function(){
-  context.clearRect(0, 0, 600, 300);
+var food = new Food(10, context);
+food.generateNewPosition();
+
+/*var gameLoopIntervalId = setInterval(function() {
+  context.clearRect(0, 0, canvasWidth, canvasHeight);
+  //game_background();
   snake.print();
   snake.move();
+  food.print();
   snake.check_borders();
-}, 100);
+  snake.check_food();
+}, 100);*/
 
 function Pixel(x, y, size, context) {
   this.x = x;
@@ -109,20 +145,83 @@ function Food(size, context) {
   this.context = context;
 
   this.generateNewPosition = function() {
-    this.x = Math.round(Math.random() * (600 - this.size) / this.size);
-    this.y = Math.round(Math.random() * (300 - this.size) / this.size);;
+    this.x = Math.round(Math.random() * (canvasWidth - this.size) / this.size);
+    this.y = Math.round(Math.random() * (canvasHeight - this.size) / this.size);
+    this.color = "#" + (Math.round(Math.random() * 0XFFFFFF)).toString(16);
   }
 
   this.print = function() {
-    this.generateNewPosition();
-console.log(this.x);
-    this.context.fillStyle = "red";
+    this.context.fillStyle = this.color;
     this.context.fillRect(this.x*this.size, this.y*this.size, this.size, this.size);
   }
 }
 
-function getRandomizer(bottom, top) {
-  return function() {
-    return Math.floor( Math.random() * ( 1 + top - bottom ) ) + bottom;
-  }
+function gameLoop() {
+    gameLoopIntervalId = setInterval(function() {
+    context.clearRect(0, 0, canvasWidth, canvasHeight);
+    //game_background();
+    snake.print();
+    snake.move();
+    food.print();
+    snake.check_borders();
+    snake.check_food();
+  }, 100);
 }
+
+$(function() {
+        console.log("I AM READY");
+        var
+            socket = new io("http://localhost:3000"),
+            socketId = null,
+            gameId = null;
+        window.socket = socket;
+
+        socket.on("connect", function(data) {
+            socketId = socket.io.engine.id;
+            runAfterSocketHasConnected();
+        });
+
+        socket.on("start", function(data) {
+            console.log("game has started");
+            console.log(data);
+            gameLoop();
+        });
+
+        socket.on("render", function(data) {
+            console.log("Should render now");
+            console.log(data);
+        });
+
+        function runAfterSocketHasConnected() {
+            $("#createGame").on("click", function() {
+                $.ajax({
+                    url: "http://localhost:3000/createGame",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        playerName: $("#playerName").val(),
+                        socketId: socketId
+                    })
+                }).done(function(result) {
+                    gameId = result.gameId;
+                    console.log("Game is created with id: ", gameId);
+                });
+            });
+
+            $("#joinGame").on("click", function() {
+                gameId = $("#joinGameId").val();
+                $.ajax({
+                    url: "http://localhost:3000/joinGame",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        playerName: $("#playerName").val(),
+                        socketId: socketId,
+                        gameId: gameId
+                    })
+                }).done(function(result) {
+                    console.log(result);
+                });
+            });
+        }
+    });

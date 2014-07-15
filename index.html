@@ -5,9 +5,17 @@
     <title>Canvas Snake</title>
     </head>
     <body>
+    	<input type="text" id="playerName" value="RadoRado">
+		<button id="createGame">Create Game</button>
+
+		<br>
+		<input type="text" id="joinGameId">
+		<button id="joinGame">Join Game</button>
+
     	<canvas id='canvas' width='600' height='300' style="border: 4px solid">
     	</canvas>
     	<script src="bower_components/jquery/dist/jquery.min.js"></script>
+    	<script src="bower_components/socket.io-client/socket.io.js"></script>
     	<script type="text/javascript" src="app.js"></script>
     </body>
  </html>
